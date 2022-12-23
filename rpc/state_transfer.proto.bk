@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package state_transfer;
+
+message update{
+    string tblName = 1;
+    string colName = 2; 
+
+    //i.e., this is the k-th update in the stream
+    int64 updateID = 3;
+
+    //use primary key or index (the n-th) row
+    string rowKey = 4;
+    string rowValue = 5;
+    int64 rowIndex = 6;
+
+    //assume all up
+    string colValue = 7; 
+    enum OpType {
+        UPDATE = 0; //default, update the value with the key
+        INSERT = 1; //insert a new row
+        REMOVE = 2; //remove a row
+    }
+
+    OpType optype = 8; 
+    int64 txnId = 9;
+}
+
+message updateResp{
+    //For now, just an int ack
+    //May need to add more later
+    int32 res = 1; 
+}
+
+message TxnInfo{
+    int64 txnId = 1; 
+    
+    //this may not be necessary
+    //e.g., TPCC_NEW_ORDER; TPCH_QUERY_1
+    //Define this macros in directly in the source code for easy maintainence. 
+    int32 TxnType = 2; 
+
+    //Seems to have redundant info with TxnType (but may make coding easier)
+    bool isQuery = 3;
+}
+
+message order{
+
+    string tblName = 1;
+    string colName = 2;
+
+    //i.e. this is the k-th order message in the stream
+    int64 orderID = 3; 
+
+    //TODO: Are we using an arrary for txn id orders?
+    TxnInfo txnIds = 4;
+    int32 updateCnt = 5; //how many updates involved in these order.
+}
+
+message orderResp{
+    //For now, just an int ack
+    //May need to add more later
+    int32 res = 1; 
+}
+
+service OLAPServer{
+    rpc TransferUpdate (stream update) returns (stream updateResp) {}
+    rpc TransferOrder (stream order) returns (stream orderResp) {}
+}

@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package state_transfer;
+
+message Update{
+    int64 row_index = 1; //not sure the type. use int for now
+
+    string pkey_col_name = 2; //e.g., "customer.id"
+
+    string pkey_val = 3; //e.g., "8100" is the customer id
+
+    string value = 4;  //the updated value, int and float all change to string. 
+
+    enum OpType {
+        UPDATE = 0; //default, update the value with the key
+        INSERT = 1; //insert a new row
+        REMOVE = 2; //remove a row
+    }
+    OpType op_type = 5;
+
+    int64 txnId = 6; //the id of the txn that the update belongs to.
+}
+
+message UpdateReq{
+    int32 shard_id = 1; //which shard I am working on
+    string col_id = 2; //e.g., "customer.balance". 
+    repeated Update updates = 3; 
+}
+
+message UpdateResp{
+    //For now, just an int ack
+    //May need to add more later
+    int32 res = 1; 
+}
+
+/* message TxnInfo{
+    int64 txnId = 1; 
+    
+    //this may not be necessary
+    //e.g., TPCC_NEW_ORDER; TPCH_QUERY_1
+    //Define this macros in directly in the source code for easy maintainence. 
+    int32 TxnType = 2; 
+
+    //Seems to have redundant info with TxnType (but may make coding easier)
+    bool isQuery = 3;
+} */
+
+message TouchedColumn{
+    string col_id = 1;
+    int32  up_num = 2;
+}
+
+message Order{ 
+    int64 txn_id = 1;
+    int64 epoch = 2; //Do we need epoch here???
+    int64 estimated_lat = 3;
+    bool fast_path = 4;
+    int64 txn_type = 5;
+    repeated int64 parents_tid = 6; 
+    repeated TouchedColumn touched_cols = 7;
+    repeated int32 touched_shard = 8;  
+    //bool isQuery = 6;
+}
+
+message OrderReq{
+    int32 shard_id = 1;
+    repeated Order orders = 2;
+}
+
+message OrderResp{
+    //For now, just an int ack
+    //May need to add more later
+    int32 res = 1; 
+}
+
+message Query{
+    int64 txn_id = 1; 
+    int64 txn_type = 2; 
+    repeated string touched_cols = 3;
+    repeated int32 touched_shard = 4;  
+    string content = 5; //we need the SQL content?
+}
+
+message QueryResp{
+    int32 res = 1; 
+}
+
+
+//For now, only lets the leader send order/updates
+//TODO: maybe backup is closer.
+service OLAPServer{
+    //One stream per col per shard
+    rpc TransferUpdate (stream UpdateReq) returns (stream UpdateResp) {}
+
+    //One steram per shard
+    rpc TransferOrder (stream OrderReq) returns (stream OrderResp) {}
+
+    //One stream total
+    rpc SubmitQuery (stream Query) returns (stream QueryResp) {}
+}
